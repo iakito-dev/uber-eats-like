@@ -33,7 +33,7 @@ function App() {
         {/* 動的ルート：店舗ごとのフード一覧ページ */}
         <Route
           exact
-          path="/restaurants/:restaurantId/foods"
+          path="/restaurants/:restaurantsId/foods"
           render={({ match }) => (
             <Foods match={match} />
           )}
