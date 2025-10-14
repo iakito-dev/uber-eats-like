@@ -61,42 +61,49 @@ const ItemWrapper = styled('div')`
 export const Foods = ({ match }) => {
   const [foodsState, dispatch] = useReducer(foodsReducer, foodsInitialState);
 
-  // ✅ UI用のローカルステートをきちんと定義
+  // UI用のローカルステート
   const dialogInitialState = {
     isOpenOrderDialog: false,
     selectedFood: null,
     selectedFoodCount: 1,
   };
-  const [ui, setUi] = useState(dialogInitialState);
+  const [state, setState] = useState(dialogInitialState);
 
-  // ✅ ルートパラメータは単数に統一（/restaurants/:restaurantId/foods）
   const restaurantId = match.params.restaurantId;
 
   useEffect(() => {
     dispatch({ type: foodsActionTypes.FETCHING });
-    fetchFoods(restaurantId).then((data) => {
-      dispatch({
-        type: foodsActionTypes.FETCH_SUCCESS,
-        payload: { foods: data?.foods ?? [] },
+    fetchFoods(restaurantId)
+      .then((data) => {
+        dispatch({
+          type: foodsActionTypes.FETCH_SUCCESS,
+          payload: { foods: data?.foods ?? [] },
+        });
+      })
+      .catch(() => {
+        dispatch({ type: foodsActionTypes.FETCH_FAILED });
       });
-    }).catch(() => {
-      dispatch({ type: foodsActionTypes.FETCH_FAILED });
-    });
   }, [restaurantId]);
 
-  // ✅ カードクリックでダイアログを開く
+  // カードクリックでダイアログを開く
   const handleClickFood = (food) => {
-    setUi({
-      ...ui,
+    setState({
+      ...state,
       isOpenOrderDialog: true,
       selectedFood: food,
       selectedFoodCount: 1,
     });
   };
 
+  // 仮注文（後でAPI実装予定）
+  const submitOrder = () => {
+    console.log('登録ボタンが押された！');
+    // TODO: 仮注文API連携
+  };
+
   return (
     <Fragment>
-      {/* --- Header --- */}
+      {/* Header */}
       <HeaderWrapper>
         <Link to="/restaurants">
           <MainLogoImage src={MainLogo} alt="main logo" />
@@ -108,7 +115,7 @@ export const Foods = ({ match }) => {
         </BagIconWrapper>
       </HeaderWrapper>
 
-      {/* --- Foods List --- */}
+      {/* Foods List */}
       <FoodsList>
         {foodsState.fetchState === REQUEST_STATE.LOADING ? (
           <Fragment>
@@ -131,14 +138,30 @@ export const Foods = ({ match }) => {
         )}
       </FoodsList>
 
-      {/* --- Order Dialog --- */}
-      {ui.isOpenOrderDialog && (
+      {/* Order Dialog */}
+      {state.isOpenOrderDialog && (
         <FoodOrderDialog
-          food={ui.selectedFood}
-          isOpen={ui.isOpenOrderDialog}
-          onClose={() => setUi({ ...ui, isOpenOrderDialog: false })}
-          // 必要なら個数操作のハンドラも渡す:
-          // onChangeCount={(n) => setUi({ ...ui, selectedFoodCount: n })}
+          isOpen={state.isOpenOrderDialog}
+          food={state.selectedFood}
+          countNumber={state.selectedFoodCount}
+          onClickCountUp={() =>
+            setState({
+              ...state,
+              selectedFoodCount: Math.min(9, state.selectedFoodCount + 1),
+            })
+          }
+          onClickCountDown={() =>
+            setState({
+              ...state,
+              selectedFoodCount: Math.max(1, state.selectedFoodCount - 1),
+            })
+          }
+          onClickOrder={() => submitOrder()}
+          onClose={() =>
+            setState({
+              ...dialogInitialState,
+            })
+          }
         />
       )}
     </Fragment>
