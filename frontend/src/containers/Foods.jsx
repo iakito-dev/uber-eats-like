@@ -1,5 +1,5 @@
 // src/containers/Foods.jsx
-import React, { Fragment, useReducer, useEffect } from 'react';
+import React, { Fragment, useReducer, useEffect, useState } from 'react';
 import styled from '@emotion/styled';
 import { Link } from 'react-router-dom';
 
@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom';
 import LocalMallIcon from '@mui/icons-material/LocalMall';
 import { FoodWrapper } from '../components/FoodWrapper';
 import Skeleton from '@mui/material/Skeleton';
+import { FoodOrderDialog } from '../components/FoodOrderDialog';
 
 // reducers
 import {
@@ -60,15 +61,38 @@ const ItemWrapper = styled('div')`
 export const Foods = ({ match }) => {
   const [foodsState, dispatch] = useReducer(foodsReducer, foodsInitialState);
 
+  // ✅ UI用のローカルステートをきちんと定義
+  const dialogInitialState = {
+    isOpenOrderDialog: false,
+    selectedFood: null,
+    selectedFoodCount: 1,
+  };
+  const [ui, setUi] = useState(dialogInitialState);
+
+  // ✅ ルートパラメータは単数に統一（/restaurants/:restaurantId/foods）
+  const restaurantId = match.params.restaurantId;
+
   useEffect(() => {
     dispatch({ type: foodsActionTypes.FETCHING });
-    fetchFoods(match.params.restaurantsId).then((data) => {
+    fetchFoods(restaurantId).then((data) => {
       dispatch({
         type: foodsActionTypes.FETCH_SUCCESS,
         payload: { foods: data?.foods ?? [] },
       });
+    }).catch(() => {
+      dispatch({ type: foodsActionTypes.FETCH_FAILED });
     });
-  }, [match.params.restaurantsId]);
+  }, [restaurantId]);
+
+  // ✅ カードクリックでダイアログを開く
+  const handleClickFood = (food) => {
+    setUi({
+      ...ui,
+      isOpenOrderDialog: true,
+      selectedFood: food,
+      selectedFoodCount: 1,
+    });
+  };
 
   return (
     <Fragment>
@@ -95,17 +119,28 @@ export const Foods = ({ match }) => {
             ))}
           </Fragment>
         ) : (
-          foodsState.foodsList.map((food) => (
+          (foodsState.foodsList ?? []).map((food) => (
             <ItemWrapper key={food.id}>
               <FoodWrapper
                 food={food}
-                onClickFoodWrapper={(f) => console.log(f)}
+                onClickFoodWrapper={handleClickFood}
                 imageUrl={FoodImage}
               />
             </ItemWrapper>
           ))
         )}
       </FoodsList>
+
+      {/* --- Order Dialog --- */}
+      {ui.isOpenOrderDialog && (
+        <FoodOrderDialog
+          food={ui.selectedFood}
+          isOpen={ui.isOpenOrderDialog}
+          onClose={() => setUi({ ...ui, isOpenOrderDialog: false })}
+          // 必要なら個数操作のハンドラも渡す:
+          // onChangeCount={(n) => setUi({ ...ui, selectedFoodCount: n })}
+        />
+      )}
     </Fragment>
   );
 };
