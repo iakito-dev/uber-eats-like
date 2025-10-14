@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_10_08_061401) do
+ActiveRecord::Schema[8.0].define(version: 2025_10_14_145303) do
   create_table "foods", force: :cascade do |t|
     t.integer "restaurant_id", null: false
     t.string "name", null: false
@@ -28,6 +28,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_10_08_061401) do
     t.integer "count", default: 0, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.boolean "active"
     t.index ["food_id"], name: "index_line_foods_on_food_id"
     t.index ["order_id"], name: "index_line_foods_on_order_id"
     t.index ["restaurant_id"], name: "index_line_foods_on_restaurant_id"

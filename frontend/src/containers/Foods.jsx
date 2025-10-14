@@ -1,11 +1,12 @@
 // src/containers/Foods.jsx
 import React, { Fragment, useReducer, useEffect, useState } from 'react';
 import styled from '@emotion/styled';
-import { Link } from 'react-router-dom';
+import { Link, useHistory } from 'react-router-dom';
 
 // components
 import LocalMallIcon from '@mui/icons-material/LocalMall';
 import { FoodWrapper } from '../components/FoodWrapper';
+import { NewOrderConfirmDialog } from '../components/NewOrderConfirmDialog';
 import Skeleton from '@mui/material/Skeleton';
 import { FoodOrderDialog } from '../components/FoodOrderDialog';
 
@@ -18,12 +19,14 @@ import {
 
 // apis
 import { fetchFoods } from '../apis/foods';
+import { postLineFoods, replaceLineFoods } from '../apis/line_foods';
 
 // images
 import MainLogo from '../images/logo.png';
 import FoodImage from '../images/food-image.jpg';
 
 // constants
+import { HTTP_STATUS_CODE } from '../constants';
 import { COLORS } from '../style_constants';
 import { REQUEST_STATE } from '../constants';
 
@@ -57,53 +60,65 @@ const ItemWrapper = styled('div')`
   margin: 16px;
 `;
 
-// --- component ---
 export const Foods = ({ match }) => {
-  const [foodsState, dispatch] = useReducer(foodsReducer, foodsInitialState);
-
-  // UI用のローカルステート
-  const dialogInitialState = {
+  const initialState = {
     isOpenOrderDialog: false,
     selectedFood: null,
     selectedFoodCount: 1,
+    isOpenNewOrderDialog: false,
+    existingResutaurautName: '',
+    newResutaurautName: '',
   };
-  const [state, setState] = useState(dialogInitialState);
+  const [state, setState] = useState(initialState);
+  const [foodsState, dispatch] = useReducer(foodsReducer, foodsInitialState);
+  const history = useHistory();
 
+  // ✅ ルートパラメータは単数形に統一
   const restaurantId = match.params.restaurantId;
 
   useEffect(() => {
+    if (!restaurantId) return;
     dispatch({ type: foodsActionTypes.FETCHING });
     fetchFoods(restaurantId)
       .then((data) => {
         dispatch({
           type: foodsActionTypes.FETCH_SUCCESS,
-          payload: { foods: data?.foods ?? [] },
+          payload: { foods: data.foods ?? [] },
         });
       })
-      .catch(() => {
-        dispatch({ type: foodsActionTypes.FETCH_FAILED });
-      });
-  }, [restaurantId]);
+      .catch(() => dispatch({ type: foodsActionTypes.FETCH_FAILED }));
+  }, [restaurantId, dispatch]);
 
-  // カードクリックでダイアログを開く
-  const handleClickFood = (food) => {
-    setState({
-      ...state,
-      isOpenOrderDialog: true,
-      selectedFood: food,
-      selectedFoodCount: 1,
-    });
+  const submitOrder = () => {
+    postLineFoods({
+      foodId: state.selectedFood.id,
+      count: state.selectedFoodCount,
+    })
+      .then(() => history.push('/orders'))
+      .catch((e) => {
+        if (e?.response?.status === HTTP_STATUS_CODE.NOT_ACCEPTABLE) {
+          setState({
+            ...state,
+            isOpenOrderDialog: false,
+            isOpenNewOrderDialog: true,
+            existingResutaurautName: e.response.data.existing_restaurant,
+            newResutaurautName: e.response.data.new_restaurant,
+          });
+        } else {
+          throw e;
+        }
+      });
   };
 
-  // 仮注文（後でAPI実装予定）
-  const submitOrder = () => {
-    console.log('登録ボタンが押された！');
-    // TODO: 仮注文API連携
+  const replaceOrder = () => {
+    replaceLineFoods({
+      foodId: state.selectedFood.id,
+      count: state.selectedFoodCount,
+    }).then(() => history.push('/orders'));
   };
 
   return (
     <Fragment>
-      {/* Header */}
       <HeaderWrapper>
         <Link to="/restaurants">
           <MainLogoImage src={MainLogo} alt="main logo" />
@@ -115,7 +130,6 @@ export const Foods = ({ match }) => {
         </BagIconWrapper>
       </HeaderWrapper>
 
-      {/* Foods List */}
       <FoodsList>
         {foodsState.fetchState === REQUEST_STATE.LOADING ? (
           <Fragment>
@@ -130,7 +144,13 @@ export const Foods = ({ match }) => {
             <ItemWrapper key={food.id}>
               <FoodWrapper
                 food={food}
-                onClickFoodWrapper={handleClickFood}
+                onClickFoodWrapper={(f) =>
+                  setState({
+                    ...state,
+                    selectedFood: f,
+                    isOpenOrderDialog: true,
+                  })
+                }
                 imageUrl={FoodImage}
               />
             </ItemWrapper>
@@ -138,7 +158,6 @@ export const Foods = ({ match }) => {
         )}
       </FoodsList>
 
-      {/* Order Dialog */}
       {state.isOpenOrderDialog && (
         <FoodOrderDialog
           isOpen={state.isOpenOrderDialog}
@@ -147,21 +166,34 @@ export const Foods = ({ match }) => {
           onClickCountUp={() =>
             setState({
               ...state,
-              selectedFoodCount: Math.min(9, state.selectedFoodCount + 1),
+              selectedFoodCount: state.selectedFoodCount + 1,
             })
           }
           onClickCountDown={() =>
             setState({
               ...state,
-              selectedFoodCount: Math.max(1, state.selectedFoodCount - 1),
+              selectedFoodCount: state.selectedFoodCount - 1,
             })
           }
-          onClickOrder={() => submitOrder()}
+          onClickOrder={submitOrder}
           onClose={() =>
             setState({
-              ...dialogInitialState,
+              ...state,
+              isOpenOrderDialog: false,
+              selectedFood: null,
+              selectedFoodCount: 1,
             })
           }
+        />
+      )}
+
+      {state.isOpenNewOrderDialog && (
+        <NewOrderConfirmDialog
+          isOpen={state.isOpenNewOrderDialog}
+          onClose={() => setState({ ...state, isOpenNewOrderDialog: false })}
+          existingResutaurautName={state.existingResutaurautName}
+          newResutaurautName={state.newResutaurautName}
+          onClickSubmit={replaceOrder}
         />
       )}
     </Fragment>
